@@ -32,12 +32,15 @@ jobs:
           python-version: "3.11"
 
       - name: Install build deps
-        run: python -m pip install --upgrade pip pyinstaller pillow
+        run: python -m pip install --upgrade pip pyinstaller pillow cryptography
 
       - name: Run tests
         run: |
           python tests/test_collector.py
           python tests/test_server.py
+          python tests/test_auth.py
+          python tests/test_vault.py
+          python tests/test_takeout.py
 
       - name: Generate icons
         run: python tools/make_icons.py server/static/icons

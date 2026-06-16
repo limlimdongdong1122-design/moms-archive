@@ -70,11 +70,37 @@ pyinstaller bhist.spec
 
 ---
 
+## 보안: 암호화 볼트 · API 토큰
+
+민감 정보라, 중앙 DB를 마스터 비밀번호로 암호화할 수 있다. (`pip install cryptography` 필요)
+
+```bash
+python -m collector.vault init --vault ./central.db.enc          # 볼트 생성
+python -m collector.collect --vault ./central.db.enc --device my-laptop
+python -m server.app --vault ./central.db.enc --auth             # 토큰 자동 생성
+```
+
+- 볼트는 **실행 중에만 복호화**되고, 종료 시 자동 재암호화 + 평문 작업 파일 삭제.
+- 비밀번호는 프롬프트 입력 또는 `BHIST_PASSWORD` 환경변수.
+- `--auth`(자동) 또는 `--token <값>`으로 API 토큰을 켜면, 시작 시 출력되는
+  `http://…:8765/?token=…` 주소로 접속해야 데이터가 보인다. **폰/LAN 노출 시 꼭 사용 권장.**
+
+## 모바일 기록 가져오기 (Google Takeout)
+
+폰의 크롬 기록은 OS가 막아 직접 못 읽으므로, [Google Takeout](https://takeout.google.com)에서
+Chrome 데이터를 내보낸 뒤 가져온다.
+
+```bash
+python -m collector.import_takeout --db ./central.db --device my-phone Takeout.zip
+#   History.json 직접:  ... --device my-phone History.json
+#   암호화 볼트로:       ... --vault ./central.db.enc --device my-phone Takeout.zip
+```
+
 ## 보안 / 의존성
 
-- **런타임 의존성 0** (Python 표준 라이브러리). 빌드 도구(PyInstaller·Pillow)만 별도.
-- 서버 기본 바인딩은 `127.0.0.1`(이 PC만). 폰 접속이 필요할 때만 `--host 0.0.0.0`.
-- 중앙 DB(`*.db`)는 `.gitignore`로 저장소에서 제외. DB 암호화·API 토큰은 **M4** 예정.
+- **코어 런타임 의존성 0** (Python 표준 라이브러리). 암호화만 `cryptography`(선택).
+- 서버 기본 바인딩은 `127.0.0.1`(이 PC만). 폰 접속이 필요할 때만 `--host 0.0.0.0` + 토큰.
+- 중앙 DB(`*.db`)·볼트(`*.enc`)는 `.gitignore`로 저장소에서 제외.
 
 ## 이 환경에서 검증된 것 / 안 된 것
 
@@ -83,5 +109,7 @@ pyinstaller bhist.spec
 | Linux 소스 실행 / API / 대시보드 | ✅ 검증 |
 | PWA 매니페스트·서비스워커·아이콘 서빙 | ✅ 검증 |
 | Linux 단일 실행 파일 빌드 + 실행 | ✅ 검증 |
+| 암호화 볼트 + API 토큰(생성·인증·잠금·재시작 데이터 유지) | ✅ 검증 |
+| Takeout 가져오기(json·zip) | ✅ 검증 |
 | Windows/macOS 실행 파일 빌드 | ⛔ 미검증(해당 OS에서 빌드 필요) |
 | Android/iOS 에뮬레이터 실행 | ⛔ 미검증(에뮬레이터 부재) — 실제 기기/브라우저로 확인 권장 |

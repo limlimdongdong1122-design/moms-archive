@@ -17,6 +17,7 @@ dist-web/
 *.db
 *.sqlite
 *.sqlite3
+*.enc
 *-wal
 *-shm
 .env

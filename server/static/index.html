@@ -136,7 +136,19 @@ function filterQS(extra={}){
   for(const k in extra) p.set(k, extra[k]);
   return p.toString();
 }
-async function jget(path){ const r = await fetch(path); return r.json(); }
+function getToken(){ return localStorage.getItem('bhist_token') || ''; }
+function authHeaders(){ const t = getToken(); return t ? { 'Authorization': 'Bearer ' + t } : {}; }
+let _prompted = false;
+function promptToken(){
+  if(_prompted) return; _prompted = true;
+  const t = window.prompt('이 대시보드는 API 토큰이 필요합니다.\n서버 콘솔에 표시된 토큰을 입력하세요:');
+  if(t){ localStorage.setItem('bhist_token', t.trim()); location.reload(); }
+}
+async function jget(path){
+  const r = await fetch(path, { headers: authHeaders() });
+  if(r.status === 401){ $("#conn").textContent = '● 토큰 필요'; promptToken(); throw new Error('unauthorized'); }
+  return r.json();
+}
 
 function bars(container, rows, labelKey, valKey){
   if(!rows.length){ container.innerHTML = '<div class="muted">데이터 없음</div>'; return; }
@@ -211,6 +223,8 @@ function switchTab(name){
 }
 
 async function init(){
+  const urlToken = new URLSearchParams(location.search).get('token');
+  if(urlToken){ localStorage.setItem('bhist_token', urlToken); history.replaceState({}, '', location.pathname); }
   try{
     const h = await jget('/api/health');
     $("#conn").textContent = h.ok ? '● 연결됨' : '연결 안됨';

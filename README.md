@@ -32,7 +32,9 @@ run.bat                                        # Windows
 | 모듈 | 스택 | 역할 |
 |---|---|---|
 | `collector/` | Python (표준 라이브러리) | 브라우저 history 복사→읽기→정규화→중앙 DB 적재 |
-| `server/` | Python `http.server` | 조회·통계·비교·ingest API + 대시보드/PWA 서빙 |
+| `collector/vault.py` | cryptography (opt-in) | 마스터 비번 기반 DB 암호화 볼트(at-rest) |
+| `collector/import_takeout.py` | Python | Google Takeout(크롬 기록) 가져오기 |
+| `server/` | Python `http.server` | 조회·통계·비교·ingest API + 대시보드/PWA 서빙 (+토큰 인증) |
 | `server/static/` | 바닐라 JS + PWA | `index.html` 대시보드, `manifest.webmanifest`, `sw.js`, `icons/` |
 | `app_entry.py` · `bhist.spec` | PyInstaller | 단일 실행 파일 빌드(데스크탑) |
 | `run.sh` · `run.bat` | 셸/배치 | 더블클릭/한 줄 실행 런처 |
@@ -44,7 +46,7 @@ run.bat                                        # Windows
 - [x] **M2 — API**: 기간·브라우저·기기 필터 조회 + 두 기기 비교 + 통계 + ingest
 - [x] **M3 — 대시보드**: 필터·타임라인·통계·비교 UI (반응형, 폰 브라우저 OK)
 - [x] **패키징(부분)**: PWA(모바일/데스크탑 설치) + 데스크탑 런처 + 단일 실행 파일 빌드(Linux 검증)
-- [ ] **M4 — 보안 + 확장**: 마스터 비번→암호화, API 토큰 / 모바일 Takeout import
+- [x] **M4 — 보안 + 확장**: 마스터 비번→DB 암호화(볼트), API 토큰, 모바일 Google Takeout import
 - [ ] **M5 — 패키징(마무리)**: Windows/macOS 빌드·서명, 배포 자동화
 
 ### API 요약
@@ -59,11 +61,32 @@ run.bat                                        # Windows
 
 `start`/`end`는 Unix epoch 초(UTC).
 
+## 보안 (암호화 · 토큰)
+
+```bash
+# 1) 암호화 볼트 생성(마스터 비번)
+python -m collector.vault init --vault ./central.db.enc
+
+# 2) 암호화 볼트로 수집 / 실행  (마스터 비번 입력 또는 BHIST_PASSWORD 환경변수)
+python -m collector.collect --vault ./central.db.enc --device my-laptop
+python -m server.app --vault ./central.db.enc --auth        # --auth: API 토큰 자동 생성
+
+# 3) 모바일(구글 Takeout) 기록 가져오기
+python -m collector.import_takeout --vault ./central.db.enc --device my-phone Takeout.zip
+```
+
+- 볼트는 **실행 중에만 복호화**되고 종료 시 자동 재암호화된다(평문 작업 파일 삭제).
+- `--auth`/`--token`을 쓰면 시작 시 `http://…/?token=…` 주소가 출력되고, **그 토큰이 있어야 데이터 API에 접근**할 수 있다(폰/LAN 노출 시 권장).
+- 암호화는 `pip install cryptography` 필요(코어는 의존성 0이며 평문 모드는 그대로 동작).
+
 ## 테스트
 
 ```bash
 python tests/test_collector.py   # 수집기: 추출·타임스탬프·중복제거
 python tests/test_server.py      # API·대시보드 서빙·ingest
+python tests/test_auth.py        # API 토큰 인증
+python tests/test_vault.py       # 암호화 볼트(암복호화·잠금/해제)
+python tests/test_takeout.py     # Takeout 가져오기(json·zip)
 ```
 
 ## 데이터 / 프라이버시
