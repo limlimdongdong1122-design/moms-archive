@@ -3,6 +3,7 @@
 실행:
     python -m server.app --db ./central.db                 # 이 PC에서만
     python -m server.app --db ./central.db --host 0.0.0.0  # 폰 등 같은 와이파이에서 접속
+    python -m server.app --open                            # 브라우저 자동 열기
 
 폰에서 보기: 서버를 --host 0.0.0.0 으로 띄운 뒤 폰 브라우저에서
     http://<이_PC의_IP>:8765
@@ -13,14 +14,36 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
+import threading
+import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 from . import queries
 
-STATIC_DIR = Path(__file__).with_name("static")
+
+def _static_dir() -> Path:
+    # PyInstaller로 묶이면 임시 추출 폴더(_MEIPASS) 안의 static을 사용한다.
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", ".")) / "static"
+    return Path(__file__).with_name("static")
+
+
+STATIC_DIR = _static_dir()
 DB_PATH = os.environ.get("BHIST_DB", "./central.db")
+
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+}
 
 
 def _ints(values):
@@ -38,7 +61,7 @@ def _strs(values):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "BrowserHistoryDashboard/0.2"
+    server_version = "BrowserHistoryDashboard/0.3"
 
     def log_message(self, *_):  # 요청 로그 조용히
         pass
@@ -51,13 +74,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _static(self, name="index.html"):
-        path = STATIC_DIR / name
-        if not path.is_file():
-            self.send_error(404, "not found")
-            return
-        body = path.read_bytes()
-        ctype = "text/html; charset=utf-8" if name.endswith(".html") else "application/octet-stream"
+    def _serve_static(self, relpath):
+        relpath = relpath.lstrip("/") or "index.html"
+        base = STATIC_DIR.resolve()
+        target = (base / relpath).resolve()
+        if base != target and base not in target.parents:  # 디렉터리 탈출 방지
+            return self.send_error(404, "not found")
+        if not target.is_file():
+            return self.send_error(404, "not found")
+        body = target.read_bytes()
+        ctype = CONTENT_TYPES.get(target.suffix.lower(), "application/octet-stream")
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
@@ -76,10 +102,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         qs = parse_qs(u.query)
-        if u.path in ("/", "/index.html"):
-            return self._static("index.html")
         if not u.path.startswith("/api/"):
-            return self.send_error(404, "not found")
+            return self._serve_static(u.path)  # "/" → index.html, 그 외 정적 파일/아이콘/매니페스트
 
         conn = queries.open_conn(DB_PATH)
         try:
@@ -102,7 +126,7 @@ class Handler(BaseHTTPRequestHandler):
                     conn, int(qs["a"][0]), int(qs["b"][0]),
                     start=f["start"], end=f["end"]))
             return self.send_error(404, "unknown endpoint")
-        except Exception as exc:  # 잘못된 파라미터 등
+        except Exception as exc:
             return self._json({"error": str(exc)}, status=400)
         finally:
             conn.close()
@@ -126,21 +150,35 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": str(exc)}, status=400)
 
 
+def _open_browser_later(url):
+    def _open():
+        try:
+            webbrowser.open(url)
+        except Exception:
+            pass
+    threading.Timer(0.8, _open).start()
+
+
 def main(argv=None):
     global DB_PATH
     ap = argparse.ArgumentParser(description="브라우저 방문기록 대시보드 서버")
     ap.add_argument("--db", default=DB_PATH, help="중앙 SQLite 경로")
     ap.add_argument("--host", default="127.0.0.1", help="폰 접속을 허용하려면 0.0.0.0")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--open", action="store_true", help="시작 시 브라우저 자동 열기")
     args = ap.parse_args(argv)
 
     DB_PATH = args.db
     queries.open_conn(DB_PATH).close()  # 스키마 보장
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"대시보드 실행 중 → http://{args.host}:{args.port}   (DB: {DB_PATH})")
+    shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
+    url = f"http://{shown_host}:{args.port}"
+    print(f"대시보드 실행 중 → {url}   (DB: {DB_PATH})")
     if args.host == "0.0.0.0":
         print(f"폰에서 같은 와이파이로:  http://<이_PC의_IP>:{args.port}")
+    if args.open:
+        _open_browser_later(url)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

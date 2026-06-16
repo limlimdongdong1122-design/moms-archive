@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Iterable, Mapping
 
-_SCHEMA = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+
+def _schema_path() -> Path:
+    # PyInstaller로 묶이면 _MEIPASS 안의 collector/schema.sql 을 읽는다.
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", ".")) / "collector" / "schema.sql"
+    return Path(__file__).with_name("schema.sql")
+
+
+_SCHEMA = _schema_path().read_text(encoding="utf-8")
 
 
 def connect(path: str) -> sqlite3.Connection:
