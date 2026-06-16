@@ -11,7 +11,7 @@ on:
     tags: [ "v*" ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -48,11 +48,26 @@ jobs:
       - name: Build single-file binary
         run: pyinstaller --clean -y bhist.spec
 
+      - name: Package binary (OS별 이름)
+        shell: bash
+        run: |
+          mkdir -p out
+          if [ -f dist/bhist.exe ]; then cp dist/bhist.exe "out/bhist-${{ runner.os }}-x64.exe"; fi
+          if [ -f dist/bhist ]; then cp dist/bhist "out/bhist-${{ runner.os }}-x64"; fi
+          ls -la out
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: bhist-${{ matrix.os }}
-          path: |
-            dist/bhist
-            dist/bhist.exe
+          path: out/*
           if-no-files-found: error
+
+      - name: Publish release (태그 푸시에만)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" out/* --title "$GITHUB_REF_NAME" --generate-notes \
+            || gh release upload "$GITHUB_REF_NAME" out/* --clobber

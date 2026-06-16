@@ -50,6 +50,17 @@ pyinstaller bhist.spec
 | Windows | Windows | `dist/bhist.exe` | Windows에서 직접 빌드 필요 |
 | macOS | macOS | `dist/bhist` | macOS에서 직접 빌드 필요(서명 권장) |
 
+## 릴리스(배포) 만들기
+
+태그를 푸시하면 CI가 3-OS 바이너리를 빌드해 GitHub Release에 자동 첨부한다.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+# → Actions(build-desktop) 실행 후 v0.1.0 릴리스에
+#   bhist-Linux-x64 / bhist-macOS-x64 / bhist-Windows-x64.exe 가 첨부됨
+```
+
 ## 모바일에서 보기 (PWA)
 
 1. PC에서 LAN 접속 허용으로 실행:
