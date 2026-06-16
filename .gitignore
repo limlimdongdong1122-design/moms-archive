@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# 로컬 데이터 / 비밀
+*.db
+*.sqlite
+*.sqlite3
+*-wal
+*-shm
+.env
+*.key
+secrets.json
