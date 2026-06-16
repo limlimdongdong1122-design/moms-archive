@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 빌드 산출물 (PyInstaller 등)
+build/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+dist-web/
+
+# 로컬 데이터 / 비밀
+*.db
+*.sqlite
+*.sqlite3
+*.enc
+*-wal
+*-shm
+.env
+*.key
+secrets.json
