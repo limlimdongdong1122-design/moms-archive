@@ -89,6 +89,15 @@ python tests/test_vault.py       # 암호화 볼트(암복호화·잠금/해제)
 python tests/test_takeout.py     # Takeout 가져오기(json·zip)
 ```
 
+## Vercel 라이브 데모
+
+`vercel.json`이 `server/static`을 웹 루트로 서빙한다. 백엔드(`/api/*`)가 없는 정적 배포에서는
+대시보드가 자동으로 **데모 데이터로 폴백**(`server/static/demo.js`)해 동작 화면을 보여준다.
+헤더에 `● 데모 모드 (백엔드 미연결)`로 표시되며, **실제 내 기록은 로컬 실행**(`python -m server.app`)에서만 보인다.
+
+> Vercel이 출력 디렉터리를 자동 인식하지 못하면, 프로젝트 설정의 **Output Directory**를
+> `server/static`으로 지정하면 된다.
+
 ## 데이터 / 프라이버시
 
 - 본인 기기의 본인 데이터만 다루는 **개인용** 도구다.
