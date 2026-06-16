@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브라우저 방문기록 대시보드</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#334155; --line:#475569;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#fb7185; --accent2:#38bdf8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:14px 20px;border-bottom:1px solid var(--panel2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;font-weight:600}
+  header .sub{color:var(--muted);font-size:12px;margin-left:auto}
+  main{max-width:1000px;margin:0 auto;padding:16px}
+  .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;background:var(--panel);padding:14px;border-radius:12px}
+  label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  input,select,button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px}
+  button{cursor:pointer}
+  button.primary{background:var(--accent);color:#1f2937;border:none;font-weight:600}
+  .tabs{display:flex;gap:6px;margin:16px 0;flex-wrap:wrap}
+  .tabs button.active{background:var(--accent2);color:#0b1220;border:none;font-weight:600}
+  .card{background:var(--panel);border-radius:12px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid var(--panel2);vertical-align:top}
+  th{color:var(--muted);font-weight:500}
+  td a{color:var(--accent2);text-decoration:none;word-break:break-all}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--panel2);font-size:11px;color:var(--muted)}
+  .barrow{display:grid;grid-template-columns:130px 1fr 46px;gap:8px;align-items:center;margin:6px 0;font-size:12px}
+  .barrow .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar{height:10px;border-radius:6px;background:var(--accent2);min-width:2px}
+  .num{text-align:right;color:var(--muted)}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .stat{background:var(--panel2);border-radius:10px;padding:12px}
+  .stat .n{font-size:22px;font-weight:700}
+  .stat .l{font-size:11px;color:var(--muted)}
+  .cmp{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .muted{color:var(--muted)}
+  @media(max-width:640px){ .cmp{grid-template-columns:1fr} .barrow{grid-template-columns:96px 1fr 40px} header .sub{margin-left:0} }
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:22px">🗂️</span>
+  <h1>브라우저 방문기록 대시보드</h1>
+  <span class="sub" id="conn">…</span>
+</header>
+
+<main>
+  <div class="filters">
+    <label>시작일<input type="date" id="f-start"></label>
+    <label>종료일<input type="date" id="f-end"></label>
+    <label>기기<select id="f-device"><option value="">전체</option></select></label>
+    <label>브라우저<select id="f-browser"><option value="">전체</option></select></label>
+    <label>검색 (제목·URL)<input type="text" id="f-q" placeholder="예: github"></label>
+    <label>&nbsp;<button class="primary" id="apply">조회</button></label>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="timeline" class="active">타임라인</button>
+    <button data-tab="stats">통계</button>
+    <button data-tab="compare">두 기기 비교</button>
+  </div>
+
+  <section id="tab-timeline">
+    <div class="card">
+      <div id="timeline-meta" class="muted" style="margin-bottom:8px"></div>
+      <table>
+        <thead><tr><th>시각</th><th>기기</th><th>브라우저</th><th>제목 / URL</th></tr></thead>
+        <tbody id="timeline-body"></tbody>
+      </table>
+      <div style="text-align:center;margin-top:12px">
+        <button id="more-btn" style="display:none">더 보기</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-stats" style="display:none">
+    <div class="card"><div class="stat-grid" id="stat-cards"></div></div>
+    <div class="card"><h3>브라우저별</h3><div id="stat-browser"></div></div>
+    <div class="card"><h3>날짜별</h3><div id="stat-day"></div></div>
+    <div class="card"><h3>자주 방문한 도메인 Top 15</h3><div id="stat-domains"></div></div>
+  </section>
+
+  <section id="tab-compare" style="display:none">
+    <div class="card">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <label>기기 A<select id="c-a"></select></label>
+        <label>기기 B<select id="c-b"></select></label>
+        <button class="primary" id="cmp-run">비교</button>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:8px">기간 필터(위)도 함께 적용됩니다. 도메인 기준으로 비교해요.</div>
+    </div>
+    <div class="cmp">
+      <div class="card"><h3 id="cmp-a-title">A에만</h3><div id="cmp-only-a"></div></div>
+      <div class="card"><h3>양쪽 다</h3><div id="cmp-both"></div></div>
+      <div class="card"><h3 id="cmp-b-title">B에만</h3><div id="cmp-only-b"></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+let offset = 0;
+const PAGE = 100;
+
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtTime(t){ return new Date(t*1000).toLocaleString('ko-KR'); }
+
+function dateToEpoch(v, endExclusive=false){
+  if(!v) return null;
+  const s = Math.floor(new Date(v+"T00:00:00").getTime()/1000);
+  return endExclusive ? s + 86400 : s;
+}
+function filterQS(extra={}){
+  const p = new URLSearchParams();
+  const dev = $("#f-device").value; if(dev) p.set("device", dev);
+  const br  = $("#f-browser").value; if(br) p.set("browser", br);
+  const q   = $("#f-q").value.trim(); if(q) p.set("q", q);
+  const s = dateToEpoch($("#f-start").value); if(s!==null) p.set("start", s);
+  const e = dateToEpoch($("#f-end").value, true); if(e!==null) p.set("end", e);
+  for(const k in extra) p.set(k, extra[k]);
+  return p.toString();
+}
+async function jget(path){ const r = await fetch(path); return r.json(); }
+
+function bars(container, rows, labelKey, valKey){
+  if(!rows.length){ container.innerHTML = '<div class="muted">데이터 없음</div>'; return; }
+  const max = Math.max(1, ...rows.map(r => r[valKey]));
+  container.innerHTML = rows.map(r => `
+    <div class="barrow">
+      <div class="label">${escapeHtml(r[labelKey])}</div>
+      <div class="bar" style="width:${Math.round(r[valKey]/max*100)}%"></div>
+      <div class="num">${r[valKey]}</div>
+    </div>`).join('');
+}
+
+// ── 타임라인 ──
+async function loadTimeline(reset=false){
+  if(reset){ offset = 0; $("#timeline-body").innerHTML = ''; }
+  const data = await jget('/api/visits?'+filterQS({limit:PAGE, offset}));
+  const body = $("#timeline-body");
+  data.items.forEach(v => {
+    body.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${fmtTime(v.visit_time)}</td>
+        <td><span class="pill">${escapeHtml(v.device)}</span></td>
+        <td>${escapeHtml(v.browser)}</td>
+        <td>${v.title ? escapeHtml(v.title) : ''}<br>
+            <a href="${encodeURI(v.url)}" target="_blank" rel="noreferrer">${escapeHtml(v.url)}</a></td>
+      </tr>`);
+  });
+  const shown = Math.min(offset + PAGE, data.total);
+  $("#timeline-meta").textContent = `총 ${data.total}건 중 ${shown}건 표시`;
+  $("#more-btn").style.display = (offset + PAGE < data.total) ? 'inline-block' : 'none';
+}
+
+// ── 통계 ──
+async function loadStats(){
+  const s = await jget('/api/stats?'+filterQS());
+  $("#stat-cards").innerHTML = `
+    <div class="stat"><div class="n">${s.total}</div><div class="l">총 방문</div></div>
+    <div class="stat"><div class="n">${s.per_device.length}</div><div class="l">기기</div></div>
+    <div class="stat"><div class="n">${s.per_browser.length}</div><div class="l">브라우저</div></div>
+    <div class="stat"><div class="n">${s.top_domains.length}</div><div class="l">상위 도메인</div></div>`;
+  bars($("#stat-browser"), s.per_browser, 'browser', 'count');
+  bars($("#stat-day"), s.per_day, 'day', 'count');
+  bars($("#stat-domains"), s.top_domains, 'domain', 'count');
+}
+
+// ── 비교 ──
+async function runCompare(){
+  const a = $("#c-a").value, b = $("#c-b").value;
+  if(!a || !b){ return; }
+  if(a === b){ alert('서로 다른 기기를 선택하세요.'); return; }
+  const c = await jget(`/api/compare?a=${a}&b=${b}&`+filterQS());
+  $("#cmp-a-title").textContent = `${$("#c-a").selectedOptions[0].text}에만 (${c.only_a_count})`;
+  $("#cmp-b-title").textContent = `${$("#c-b").selectedOptions[0].text}에만 (${c.only_b_count})`;
+  const render = rows => rows.length ? rows.map(r => `
+    <div class="barrow">
+      <div class="label">${escapeHtml(r.domain)}</div>
+      <div class="muted" style="font-size:11px">A ${r.count_a} · B ${r.count_b}</div>
+      <div></div>
+    </div>`).join('') : '<div class="muted">없음</div>';
+  $("#cmp-only-a").innerHTML = render(c.only_a);
+  $("#cmp-both").innerHTML   = render(c.both);
+  $("#cmp-only-b").innerHTML = render(c.only_b);
+}
+
+// ── 탭 / 이벤트 ──
+function switchTab(name){
+  document.querySelectorAll('.tabs button').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === name));
+  ['timeline','stats','compare'].forEach(t =>
+    $("#tab-"+t).style.display = (t === name ? 'block' : 'none'));
+  if(name === 'stats') loadStats();
+}
+
+async function init(){
+  try{
+    const h = await jget('/api/health');
+    $("#conn").textContent = h.ok ? '● 연결됨' : '연결 안됨';
+  }catch(e){ $("#conn").textContent = '● 서버 연결 안됨'; }
+
+  const devs = await jget('/api/devices');
+  const brs  = await jget('/api/browsers');
+  for(const d of devs){
+    $("#f-device").insertAdjacentHTML('beforeend', `<option value="${d.id}">${escapeHtml(d.name)} (${d.visits})</option>`);
+    $("#c-a").insertAdjacentHTML('beforeend', `<option value="${d.id}">${escapeHtml(d.name)}</option>`);
+    $("#c-b").insertAdjacentHTML('beforeend', `<option value="${d.id}">${escapeHtml(d.name)}</option>`);
+  }
+  if(devs.length > 1) $("#c-b").selectedIndex = 1;
+  for(const b of brs){
+    $("#f-browser").insertAdjacentHTML('beforeend', `<option value="${b.browser}">${escapeHtml(b.browser)} (${b.visits})</option>`);
+  }
+
+  $("#apply").addEventListener('click', () => { loadTimeline(true); loadStats(); });
+  $("#more-btn").addEventListener('click', () => { offset += PAGE; loadTimeline(); });
+  $("#cmp-run").addEventListener('click', runCompare);
+  document.querySelectorAll('.tabs button').forEach(b =>
+    b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+  loadTimeline(true);
+}
+
+init();
+</script>
+</body>
+</html>
