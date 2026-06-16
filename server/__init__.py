@@ -6,4 +6,12 @@
 를 함께 제공한다.
 """
 
+import sys as _sys
+
+try:  # Windows 콘솔(cp1252)에서도 한글/이모지 출력이 깨지지 않도록 UTF-8 강제
+    _sys.stdout.reconfigure(encoding="utf-8")
+    _sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 __all__ = ["queries", "app"]

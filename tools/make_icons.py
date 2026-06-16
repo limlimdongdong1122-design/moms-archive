@@ -11,6 +11,11 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+try:  # Windows 콘솔에서도 한글 출력이 깨지지 않도록
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 BG = (15, 23, 42)      # slate-950
 BLUE = (56, 189, 248)  # sky-400
 ROSE = (251, 113, 133) # rose-400
