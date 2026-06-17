@@ -1,0 +1,10 @@
+{
+  "name": "run-moms-archive-driver",
+  "private": true,
+  "type": "module",
+  "description": "Headless-chromium harness that drives the running 방문기록 dashboard.",
+  "dependencies": {
+    "@sparticuz/chromium": "123.0.1",
+    "puppeteer-core": "^22"
+  }
+}
